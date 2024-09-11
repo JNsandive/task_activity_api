@@ -23,11 +23,11 @@ pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
-def verify_password(plain_password, hashed_password):
+async def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_password_hash(password):
+async def get_password_hash(password):
     return pwd_context.hash(password)
 
 
@@ -46,6 +46,7 @@ async def create_access_token(data: dict):
         return response
 
     except Exception as e:
+        logger.error(f"Error creating access token: {str(e)}")
         raise HTTPException(status_code=400, detail="Could not create access token")
 
 
@@ -54,7 +55,7 @@ async def authenticate_user_and_create_token(db: Session, username: str, passwor
     try:
         # Check if the user exists by querying the database
         user = db.query(User).filter(User.email == username).first()
-        if not user or not verify_password(password, user.hashed_password):
+        if not user or not await verify_password(password, user.hashed_password):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Incorrect username or password",

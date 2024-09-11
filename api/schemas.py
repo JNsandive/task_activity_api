@@ -5,12 +5,35 @@ from typing import Optional, List
 
 class TaskBase(BaseModel):
     task_name: str
-    status: Optional[str] = "Not Started"
+    task_description: Optional[str] = None
+    status: Optional[str] = "In Active"
     favorite: Optional[bool] = False
 
+    class Config:
+        from_attributes = True  # New way in Pydantic V2
 
-class TaskCreate(TaskBase):
-    pass
+
+# Attachment schema
+class AttachmentCreate(BaseModel):
+    file_name: str
+
+
+class TaskActivityCreate(TaskBase):
+    activity_type_id: int
+    activity_group_id: Optional[int] = None
+    stage_id: Optional[int] = None
+    core_group_id: Optional[int] = None
+    due_date: Optional[datetime] = None
+    action_type: Optional[str] = None
+    link_response_ids: Optional[List[int]] = None
+    link_object_ids: Optional[List[int]] = None
+    notes: Optional[str] = None
+    attachments: Optional[List[AttachmentCreate]] = None
+    created_by_id: Optional[int] = None
+    assigned_to_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True  # New way in Pydantic V2
 
 
 class TaskResponse(TaskBase):

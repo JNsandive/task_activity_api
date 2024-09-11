@@ -33,7 +33,6 @@ class TaskActivity(Base):
     # Notes and attachments
     notes = Column(String, nullable=True)  # No max length specified for notes
     attachment_id = Column(Integer, nullable=True)  # Could be linked to another table
-    attachments = relationship("Attachment", back_populates="task")  # One-to-many relationship with Attachments
 
     # Created and modified metadata fields
     created_on = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -48,7 +47,7 @@ class TaskActivity(Base):
 
     # Relationship with TaskHistory
     history = relationship("TaskHistory", back_populates="task")
-
+    attachments = relationship("Attachment", back_populates="task")  # One-to-many relationship with Attachments
     creator = relationship("User", foreign_keys=[created_by_id], back_populates="tasks_created")
     assignee = relationship("User", foreign_keys=[assigned_to_id], back_populates="assigned_tasks")
 
