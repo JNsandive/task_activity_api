@@ -1,0 +1,12 @@
+2024-09-11 15:07:58,242 [INFO] api.crud_users: User created successfully: user@example.com
+2024-09-11 15:08:24,146 [WARNING] api.crud_users: Attempt to create user with existing email: user@example.com
+2024-09-11 15:08:24,147 [ERROR] api.crud_users: HTTP error during user creation: Email is already registered
+2024-09-11 15:09:06,020 [WARNING] api.crud_users: User with ID 1 not found
+2024-09-11 15:09:06,020 [CRITICAL] api.crud_users: Unexpected error while fetching user ID 1: 404: User with ID 1 not found
+2024-09-11 15:10:44,542 [WARNING] api.crud_users: User with ID 1 not found
+2024-09-11 15:10:44,542 [ERROR] api.crud_users: HTTP error while fetching user ID 1: User with ID 1 not found
+2024-09-11 15:20:49,968 [INFO] api.crud_users: User created successfully: nihiya@example.com
+2024-09-11 16:27:15,070 [CRITICAL] api.crud_users: Unexpected error during user creation: get_password_hash() missing 1 required positional argument: 'password'
+2024-09-11 16:39:36,535 [INFO] api.crud_users: User created successfully: amaa@example.com
+2024-09-11 16:40:23,473 [INFO] api.auth_impl: Authentication successful for user: amaa@example.com
+2024-09-11 17:09:06,279 [INFO] api.auth_impl: Authentication successful for user: amaa@example.com
