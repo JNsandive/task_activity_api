@@ -24,10 +24,10 @@ app.add_middleware(
 )
 
 # Include all routers
-app.include_router(tasks.router, prefix="/api")
-app.include_router(users.router, prefix="/api")
-app.include_router(task_history.router, prefix="/api")
-app.include_router(auth.router, prefix="/api")
+app.include_router(tasks.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(task_history.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1")
 # app.include_router(webhooks.router, prefix="/api")
 
 

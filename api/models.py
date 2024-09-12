@@ -23,7 +23,7 @@ class TaskActivity(Base):
 
     # Task-related fields
     due_date = Column(DateTime, nullable=True)
-    action_type = Column(String(100), nullable=True)  # Max length 100 characters
+    action_type = Column(String(100), nullable=True)
     status = Column(String(50), default="Not Started", nullable=False)
 
     # Fields for LinkResponseID and LinkObjectID
@@ -43,7 +43,7 @@ class TaskActivity(Base):
 
     # Foreign keys to link users (creator and assignee)
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    assigned_to_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    assigned_to_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Relationship with TaskHistory
     history = relationship("TaskHistory", back_populates="task")
