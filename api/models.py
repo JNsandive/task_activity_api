@@ -128,7 +128,7 @@ class TaskHistory(Base):
     __tablename__ = "tasks_history"
 
     id = Column(Integer, primary_key=True, index=True)
-    task_id = Column(Integer, ForeignKey("tasks_activity.task_id"), nullable=False)
+    task_id = Column(Integer, ForeignKey('tasks_activity.task_id', ondelete='CASCADE'), nullable=False)
     action = Column(String(50), nullable=False)
     previous_data = Column(Text, nullable=True)
     new_data = Column(Text, nullable=True)

@@ -11,11 +11,11 @@ logger = logging.getLogger(__name__)
 task_activity_impl = TaskActivityImpl()
 
 
-@router.get("/tasks/{task_id}/history", response_model=list[TaskHistoryResponse])
+@router.get("/tasks/{task_id}/history", response_model=list[TaskHistoryResponse],tags=["Task History"])
 def list_task_history(task_id: int, db: Session = Depends(get_db)):
     return task_activity_impl.get_task_history(db, task_id=task_id)
 
 
-@router.get("/tasks/{task_id}/history/latest", response_model=list[TaskHistoryResponse])
+@router.get("/tasks/{task_id}/history/latest", response_model=list[TaskHistoryResponse],tags=["Task History"])
 def get_latest_task_history(task_id: int, db: Session = Depends(get_db)):
     return task_activity_impl.get_task_history_latest(db, task_id=task_id)

@@ -310,6 +310,20 @@ async def log_task_history(db: Session, task_id: int, action: str, current_user:
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 
+def _delete_task_history(db: Session, task_id: int):
+    try:
+        # Delete all history records associated with the task ID
+        db.query(TaskHistory).filter(TaskHistory.task_id == task_id).delete(synchronize_session=False)
+        db.commit()
+        logger.info(f"Deleted all history records for task ID {task_id}")
+
+    except SQLAlchemyError as e:
+        logger.error(f"Error deleting task history for task ID {task_id}: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="An error occurred while deleting task history")
+
+
+
 class TaskActivityImpl:
     def __init__(self):
         pass
@@ -526,31 +540,30 @@ class TaskActivityImpl:
     # delete a task
     async def delete_task(self, db: Session, task_id: int, current_user: User):
         try:
+            # Check user authentication
+            check_user_auth(current_user)
+
+            # Fetch the task by ID
             task = _get_task_by_id(db, task_id)
             if not task:
                 logger.warning(f"Task with ID {task_id} not found")
                 raise HTTPException(status_code=404, detail=f"Task with ID {task_id} not found")
 
-            # Store previous data before deletion
-            previous_data = {
-                "task_name": task.task_name,
-                "status": task.status,
-                "favorite": task.favorite
-            }
+            # Delete task history records before deleting the task itself
+            _delete_task_history(db, task_id)
 
-            # Log task deletion in history
-            await log_task_history(db, task_id=task.task_id, action="Deleted", previous_data=previous_data,
-                                   current_user=current_user)
-
-            # Delete the task
+            # Now delete the task itself
             db.delete(task)
             db.commit()
 
             logger.info(f"Task with ID {task_id} deleted successfully")
-            return task
+            return ResponseWrapper(
+                status_code=status.HTTP_204_NO_CONTENT,
+                values={}
+            )
 
         except HTTPException as http_exc:
-            logger.error(f"HTTP error during user creation: {str(http_exc.detail)}")
+            logger.error(f"HTTP error during task deletion: {str(http_exc.detail)}")
             raise http_exc
 
         except SQLAlchemyError as e:
