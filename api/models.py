@@ -32,7 +32,7 @@ class TaskActivity(Base):
 
     # Notes and attachments
     notes = Column(String, nullable=True)  # No max length specified for notes
-    attachment_id = Column(Integer, nullable=True)  # Could be linked to another table
+    attachment_ids = Column(ARRAY(Integer), nullable=True)  # Updated: Array of attachment IDs
 
     # Created and modified metadata fields
     created_on = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -133,5 +133,7 @@ class TaskHistory(Base):
     previous_data = Column(Text, nullable=True)
     new_data = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)  # Ensure this is correctly defined
+    modified_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
+    modified_by = relationship("User", foreign_keys=[modified_by_id])
     task = relationship("TaskActivity", back_populates="history")

@@ -42,8 +42,8 @@ async def get_task_by_id(task_id: int, db: Session = Depends(get_db), current_us
     return await task_impl.get_task_by_id(db, task_id=task_id, current_user=current_user)
 
 
-@router.put("/tasks/{task_id}", response_model=TaskResponse)
-async def update_task(task_id: int, task: TaskActivityCreate, db: Session = Depends(get_db),current_user: User = Depends(get_current_user)):
+@router.put("/tasks/{task_id}", response_model=ResponseWrapper[TaskResponse])
+async def update_task(task_id: int, task: TaskActivityCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return await task_impl.update_task(db, task_id=task_id, task_data=task.dict(), current_user=current_user)
 
 

@@ -33,7 +33,7 @@ class AttachmentCreate(BaseModel):
 
 
 class TaskActivityCreate(TaskBase):
-    activity_type_id: int
+    activity_type_id:  Optional[int] = None
     activity_group_id: Optional[int] = None
     stage_id: Optional[int] = None
     core_group_id: Optional[int] = None
@@ -71,7 +71,7 @@ class TaskResponse(TaskBase):
     link_response_ids: Optional[List[int]]
     link_object_ids: Optional[List[int]]
     notes: Optional[str]
-    attachment_id: Optional[int]
+    attachment_ids: Optional[List[int]]
     created_on: datetime
     modified_on: datetime
     created_by_id: int

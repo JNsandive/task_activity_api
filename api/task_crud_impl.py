@@ -1,6 +1,6 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
+from typing import List, Optional
 
 from fastapi.responses import JSONResponse
 from fastapi import HTTPException, status
@@ -13,7 +13,7 @@ from .models import TaskActivity, TaskHistory, User, Attachment, ActivityType, A
 from datetime import datetime
 import json
 
-from .schemas import TaskResponse, ResponseWrapper, TaskCreatedResponse
+from .schemas import TaskResponse, ResponseWrapper, TaskCreatedResponse, AttachmentCreate, TaskActivityCreate
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -105,7 +105,7 @@ def run_validations(db: Session, task_data):
 
 
 # Create a task entry in the database
-def _create_task_entry(db: Session, task_data, user_id: int):
+def _create_task_entry_and_save(db: Session, task_data, user_id: int, attachment_ids: Optional[List[int]] = None):
     task = TaskActivity(
         task_name=task_data.task_name,
         task_description=task_data.task_description,
@@ -120,7 +120,10 @@ def _create_task_entry(db: Session, task_data, user_id: int):
         activity_group_id=task_data.activity_group_id,
         assigned_to_id=task_data.assigned_to_id,
         stage_id=task_data.stage_id,
-        core_group_id=task_data.core_group_id
+        core_group_id=task_data.core_group_id,
+        notes=task_data.notes,
+        link_response_ids=task_data.link_response_ids,
+        link_object_ids=task_data.link_object_ids,
     )
     db.add(task)
     db.commit()
@@ -128,15 +131,21 @@ def _create_task_entry(db: Session, task_data, user_id: int):
     return task
 
 
-def _handle_attachments(db: Session, task: TaskActivity, task_data):
-    if task_data.attachments:
-        for attachment_data in task_data.attachments:
+# Updated _handle_attachments method
+def _handle_attachments(db: Session, task: TaskActivity, attachments: List[AttachmentCreate]):
+    if attachments:
+        attachment_ids = []
+        for attachment_data in attachments:
+            # Access the file_name using dot notation instead of brackets
             attachment = Attachment(
                 task_id=task.task_id,
                 file_name=attachment_data.file_name
             )
             db.add(attachment)
-        db.commit()
+            db.commit()  # Commit to generate the attachment ID
+            attachment_ids.append(attachment.id)  # Collect attachment ID
+        return attachment_ids
+    return []
 
 
 def task_created_response(task: TaskActivity):
@@ -183,16 +192,46 @@ def query_tasks(db: Session, user_id: int, task_type: str, skip: int, limit: int
 
 # Helper method to wrap tasks in the response
 def wrap_task_response(tasks: List[TaskActivity]):
-    task_responses = [TaskResponse.from_orm(task) for task in tasks]
+    task_responses = []
+
+    for task in tasks:
+        # Manually constructing the response instead of using from_orm to handle attachment_ids
+        task_response = TaskResponse(
+            task_id=task.task_id,
+            task_name=task.task_name,
+            task_description=task.task_description,
+            status=task.status,
+            favorite=task.favorite,
+            due_date=task.due_date,
+            action_type=task.action_type,
+            activity_type_id=task.activity_type_id,
+            activity_group_id=task.activity_group_id,
+            stage_id=task.stage_id,
+            core_group_id=task.core_group_id,
+            link_response_ids=task.link_response_ids,
+            link_object_ids=task.link_object_ids,
+            notes=task.notes,
+            attachment_ids=task.attachment_ids,
+            created_on=task.created_on,
+            modified_on=task.modified_on,
+            created_by_id=task.created_by_id,
+            assigned_to_id=task.assigned_to_id
+        )
+        task_responses.append(task_response)
+
     return ResponseWrapper(
         status_code=status.HTTP_200_OK,
         values=task_responses
     )
 
 
+# Helper method to apply task updates with handling of optional fields
 def _apply_task_updates(task: TaskActivity, task_data: dict):
     for key, value in task_data.items():
-        setattr(task, key, value)
+        if value is not None:
+            setattr(task, key, value)
+
+    # Ensure the modified_on field is updated
     task.modified_on = datetime.utcnow()
 
 
@@ -210,7 +249,7 @@ def _get_previous_task_data(task: TaskActivity) -> dict:
         "link_response_ids": task.link_response_ids,
         "link_object_ids": task.link_object_ids,
         "notes": task.notes,
-        "attachment_id": task.attachment_id,
+        "attachment_ids": task.attachment_ids,
         "favorite": task.favorite,
         "created_by_id": task.created_by_id,
         "assigned_to_id": task.assigned_to_id,
@@ -228,14 +267,14 @@ def _check_task_permissions(task: TaskActivity, current_user: User):
 def _get_task_by_id(db: Session, task_id: int) -> TaskActivity:
     task = db.query(TaskActivity).filter(TaskActivity.task_id == task_id).first()
     if not task:
-        logger.warning(f"Task with ID {task_id} not found")
         raise HTTPException(status_code=404, detail=f"Task with ID {task_id} not found")
     return task
 
 
-async def log_task_history(db: Session, task_id: int, action: str, previous_data=None, new_data=None):
+async def log_task_history(db: Session, task_id: int, action: str, current_user: User, previous_data=None,
+                           new_data=None):
     try:
-        # Convert data to JSON serializable format
+        # Ensure data is JSON serializable
         if previous_data:
             previous_data = {key: (value.isoformat() if isinstance(value, datetime) else value) for key, value in
                              previous_data.items()}
@@ -243,14 +282,17 @@ async def log_task_history(db: Session, task_id: int, action: str, previous_data
             new_data = {key: (value.isoformat() if isinstance(value, datetime) else value) for key, value in
                         new_data.items()}
 
-        # Convert data to JSON string if necessary
+        # Log the history entry
         history_entry = TaskHistory(
             task_id=task_id,
             action=action,
             previous_data=json.dumps(previous_data) if previous_data else None,
             new_data=json.dumps(new_data) if new_data else None,
             created_at=datetime.utcnow(),
+            modified_by_id=current_user.id  # Store the user who modified the task
+
         )
+
         db.add(history_entry)
         db.commit()
 
@@ -273,7 +315,7 @@ class TaskActivityImpl:
         pass
 
     # Main method to create task
-    async def create_task(self, db: Session, task_data, current_user):
+    async def create_task(self, db: Session, task_data: TaskActivityCreate, current_user: User):
         try:
             # Check user authentication
             check_user_auth(current_user)
@@ -284,19 +326,25 @@ class TaskActivityImpl:
                 # Validate fields asynchronously using a ThreadPoolExecutor
                 run_validations(db, task_data)
 
-                # Create the TaskActivity after validation
-                task = _create_task_entry(db, task_data, user_id)
+                task = _create_task_entry_and_save(db, task_data, user_id)
 
-                # Handle attachments
-                _handle_attachments(db, task, task_data)
+                # Handle and attach attachments
+                attachment_ids = []
+                if task_data.attachments:
+                    attachment_ids = _handle_attachments(db, task=task, attachments=task_data.attachments)
+
+                # Update the task with the list of attachment IDs
+                if attachment_ids:
+                    task.attachment_ids = attachment_ids
 
                 # Log task creation history
-                await log_task_history(db, task_id=task.task_id, action="Added", new_data=task_data.dict())
+                await log_task_history(db, task_id=task.task_id, action="Added", new_data=task_data.dict(),
+                                       current_user=current_user)
 
                 logger.info(f"Task created successfully for user {user_id}, Task ID: {task.task_id}")
 
                 response = task_created_response(task)
-                # return response
+
                 return ResponseWrapper(
                     status_code=status.HTTP_201_CREATED,
                     values=response
@@ -392,19 +440,38 @@ class TaskActivityImpl:
             # Store the previous task data
             previous_data = _get_previous_task_data(task)
 
-            # Apply updates to the task
-            _apply_task_updates(task, task_data)
+            # Handle attachments separately if they exist in task_data
+            if 'attachments' in task_data and task_data['attachments'] is not None:
+                # Convert dictionaries to AttachmentCreate models
+                attachments = [AttachmentCreate(**attachment) for attachment in task_data['attachments']]
+                attachment_ids = _handle_attachments(db, task, attachments)
+                task.attachment_ids = attachment_ids  # Update the task's attachment IDs
+                db.commit()  # Commit the change to update the task with attachment IDs
+
+            # Apply updates to the task (merge the dictionary into the task instance)
+            for key, value in task_data.items():
+                if key == 'attachments':  # Skip the attachments field
+                    continue
+                if value is not None:  # Only update fields if value is provided
+                    setattr(task, key, value)
+
+            # Update modified timestamp
+            task.modified_on = datetime.utcnow()
 
             # Commit changes to the database
             db.commit()
+            db.refresh(task)
 
             # Log the changes in history
             await log_task_history(db, task_id=task.task_id, action="Modified", previous_data=previous_data,
-                                   new_data=task_data)
+                                   new_data=task_data, current_user=current_user)
 
             logger.info(f"Task with ID {task_id} updated successfully")
-            return task
 
+            return ResponseWrapper(
+                status_code=status.HTTP_200_OK,
+                values=task
+            )
         except HTTPException as http_exc:
             logger.error(f"HTTP error during task update: {str(http_exc.detail)}")
             raise http_exc
@@ -424,8 +491,7 @@ class TaskActivityImpl:
             check_user_auth(current_user)
 
             # Retrieve the task by ID
-            task = db.query(TaskActivity).filter(TaskActivity.task_id == task_id).first()
-
+            task = _get_task_by_id(db, task_id)
             # If task not found, raise 404 error
             if not task:
                 logger.warning(f"Task with ID {task_id} not found")
@@ -438,9 +504,11 @@ class TaskActivityImpl:
 
             logger.info(f"Task with ID {task_id} retrieved successfully for user {current_user.id}")
 
+            task_response = TaskResponse.from_orm(task)
+
             return ResponseWrapper(
                 status_code=status.HTTP_200_OK,
-                values=task
+                values=task_response
             )
 
         except HTTPException as http_exc:
@@ -456,9 +524,9 @@ class TaskActivityImpl:
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
     # delete a task
-    async def delete_task(self, db: Session, task_id: int):
+    async def delete_task(self, db: Session, task_id: int, current_user: User):
         try:
-            task = db.query(TaskActivity).filter(TaskActivity.task_id == task_id).first()
+            task = _get_task_by_id(db, task_id)
             if not task:
                 logger.warning(f"Task with ID {task_id} not found")
                 raise HTTPException(status_code=404, detail=f"Task with ID {task_id} not found")
@@ -471,7 +539,8 @@ class TaskActivityImpl:
             }
 
             # Log task deletion in history
-            await log_task_history(db, task_id=task.task_id, action="Deleted", previous_data=previous_data)
+            await log_task_history(db, task_id=task.task_id, action="Deleted", previous_data=previous_data,
+                                   current_user=current_user)
 
             # Delete the task
             db.delete(task)
@@ -539,4 +608,3 @@ class TaskActivityImpl:
         except Exception as e:
             logger.error(f"Unexpected error retrieving latest history for task ID {task_id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-
