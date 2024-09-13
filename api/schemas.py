@@ -33,7 +33,7 @@ class AttachmentCreate(BaseModel):
 
 
 class TaskActivityCreate(TaskBase):
-    activity_type_id:  Optional[int] = None
+    activity_type_id: Optional[int] = None
     activity_group_id: Optional[int] = None
     stage_id: Optional[int] = None
     core_group_id: Optional[int] = None
@@ -124,12 +124,19 @@ class AccessToken(BaseModel):
 
 
 class TaskHistoryResponse(BaseModel):
-    id: int
-    task_id: int
-    action: str
-    previous_data: Optional[str]
-    new_data: Optional[str]
-    created_at: datetime
+    Activity_Object: dict
+    Activity_name: str
+    Activity: str
+    Created_by: str
+    Created_at: datetime
 
-    class Config:
-        orm_mode = True
+
+class TaskDataResponse(BaseModel):
+    status: Optional[str] = None
+    created_by: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class TaskHistoryDetailsResponse(BaseModel):
+    previous_data_value: TaskDataResponse
+    latest_data_value: TaskDataResponse

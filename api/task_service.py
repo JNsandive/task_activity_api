@@ -2,7 +2,6 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Optional
 
-from fastapi.responses import JSONResponse
 from fastapi import HTTPException, status
 
 from sqlalchemy import desc, asc
@@ -10,10 +9,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from .models import TaskActivity, TaskHistory, User, Attachment, ActivityType, ActivityGroup, Stage, CoreGroup
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
-from .schemas import TaskResponse, ResponseWrapper, TaskCreatedResponse, AttachmentCreate, TaskActivityCreate
+from .schemas import TaskResponse, ResponseWrapper, TaskCreatedResponse, AttachmentCreate, TaskActivityCreate, \
+    TaskHistoryResponse
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -72,40 +72,50 @@ def validate_activity_group(db: Session, activity_group_id: int):
 
 # Validate due date
 def validate_due_date(due_date: datetime):
-    if due_date and due_date <= datetime.utcnow():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The due date must be a future date."
-        )
-    else:
-        return True
+    if due_date:
+        # Convert due_date to UTC if it's timezone-aware
+        if due_date.tzinfo is not None and due_date.tzinfo.utcoffset(due_date) is not None:
+            due_date = due_date.astimezone(timezone.utc)
+
+        # Use a timezone-aware UTC for comparison
+        now = datetime.now(timezone.utc)
+
+        if due_date <= now:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The due date must be a future date."
+            )
+    return True
 
 
 # Validate fields asynchronously using a ThreadPoolExecutor
-def run_validations(db: Session, task_data):
+def run_validations(db: Session, task_data: dict):
+    # Use ThreadPoolExecutor to validate fields concurrently
     with ThreadPoolExecutor() as executor:
-        validation_tasks = [executor.submit(validate_activity_type, db, task_data.activity_type_id)]
+        validation_tasks = []
 
-        if task_data.activity_group_id:
-            validation_tasks.append(
-                executor.submit(validate_activity_group, db, task_data.activity_group_id))
+        if task_data.get('activity_type_id') is not None:
+            validation_tasks.append(executor.submit(validate_activity_type, db, task_data['activity_type_id']))
 
-        if task_data.stage_id:
-            validation_tasks.append(executor.submit(validate_stage, db, task_data.stage_id))
+        if task_data.get('activity_group_id') is not None:
+            validation_tasks.append(executor.submit(validate_activity_group, db, task_data['activity_group_id']))
 
-        if task_data.core_group_id:
-            validation_tasks.append(executor.submit(validate_core_group, db, task_data.core_group_id))
+        if task_data.get('stage_id') is not None:
+            validation_tasks.append(executor.submit(validate_stage, db, task_data['stage_id']))
 
-        if task_data.assigned_to_id:
-            validation_tasks.append(executor.submit(validate_assign_user, db, task_data.assigned_to_id))
+        if task_data.get('core_group_id') is not None:
+            validation_tasks.append(executor.submit(validate_core_group, db, task_data['core_group_id']))
 
-        # Collect the results
+        if task_data.get('assigned_to_id') is not None:
+            validation_tasks.append(executor.submit(validate_assign_user, db, task_data['assigned_to_id']))
+
+            # Collect the results
         for future in validation_tasks:
-            future.result()  # Raise any exceptions from the validation
+            future.result()  # Raise any exception
 
 
 # Create a task entry in the database
-def _create_task_entry_and_save(db: Session, task_data, user_id: int, attachment_ids: Optional[List[int]] = None):
+def _create_task_entry_and_save(db: Session, task_data, user_id: int):
     task = TaskActivity(
         task_name=task_data.task_name,
         task_description=task_data.task_description,
@@ -174,20 +184,50 @@ def get_sort_order(sort_order: str):
 
 
 # Helper method to fetch tasks (created or assigned)
-def query_tasks(db: Session, user_id: int, task_type: str, skip: int, limit: int, sort_order: str):
-    order_by_clause = get_sort_order(sort_order)
+def query_tasks(
+        db: Session,
+        user_id: int,
+        task_type: str,
+        skip: int,
+        limit: int,
+        sort_order: str,
+        status: Optional[str] = None,
+        due_date_from: Optional[datetime] = None,
+        due_date_to: Optional[datetime] = None,
+        task_name: Optional[str] = None,
+        activity_type_id: Optional[int] = None,
+        assigned_to_id: Optional[int] = None
+):
+    query = db.query(TaskActivity)
 
+    # Filter by task type (created or assigned)
     if task_type == 'created':
-        # Fetch tasks created by the user
-        return db.query(TaskActivity).filter(TaskActivity.created_by_id == user_id) \
-            .order_by(order_by_clause).offset(skip).limit(limit).all()
-
+        query = query.filter(TaskActivity.created_by_id == user_id)  # Get tasks created by the current user
     elif task_type == 'assigned':
-        # Fetch tasks assigned to the user
-        return db.query(TaskActivity).filter(TaskActivity.assigned_to_id == user_id) \
-            .order_by(order_by_clause).offset(skip).limit(limit).all()
+        query = query.filter(TaskActivity.assigned_to_id == user_id)  # Get tasks assigned to the user
 
-    return []
+    # Apply additional filters dynamically based on the presence of query parameters
+    if status:
+        query = query.filter(TaskActivity.status == status)  # Filter by task status
+    if due_date_from:
+        query = query.filter(TaskActivity.due_date >= due_date_from)  # Filter by tasks due after 'due_date_from'
+    if due_date_to:
+        query = query.filter(TaskActivity.due_date <= due_date_to)  # Filter by tasks due before 'due_date_to'
+    if task_name:
+        query = query.filter(TaskActivity.task_name.ilike(f"%{task_name}%"))  # Filter by task name (case-insensitive)
+    if activity_type_id:
+        query = query.filter(TaskActivity.activity_type_id == activity_type_id)
+    if assigned_to_id:
+        query = query.filter(TaskActivity.assigned_to_id == assigned_to_id)
+
+    # Sorting (ascending or descending order)
+    order_by_clause = get_sort_order(sort_order)
+    query = query.order_by(order_by_clause)
+
+    # Pagination (skip and limit)
+    query = query.offset(skip).limit(limit)
+
+    return query.all()
 
 
 # Helper method to wrap tasks in the response
@@ -284,13 +324,9 @@ async def log_task_history(db: Session, task_id: int, action: str, current_user:
 
         # Log the history entry
         history_entry = TaskHistory(
-            task_id=task_id,
-            action=action,
-            previous_data=json.dumps(previous_data) if previous_data else None,
-            new_data=json.dumps(new_data) if new_data else None,
-            created_at=datetime.utcnow(),
+            task_id=task_id, action=action, previous_data=json.dumps(previous_data) if previous_data else None,
+            new_data=json.dumps(new_data) if new_data else None, created_at=datetime.utcnow(),
             modified_by_id=current_user.id  # Store the user who modified the task
-
         )
 
         db.add(history_entry)
@@ -323,6 +359,12 @@ def _delete_task_history(db: Session, task_id: int):
         raise HTTPException(status_code=500, detail="An error occurred while deleting task history")
 
 
+def _check_user_permission(current_user, task, task_id):
+    # Check if the current user is either the creator, the assignee, or an admin
+    if not current_user.is_admin and task.created_by_id != current_user.id and task.assigned_to_id != current_user.id:
+        logger.warning(f"Unauthorized access attempt for task {task_id} by user {current_user.id}")
+        raise HTTPException(status_code=403, detail="You do not have access to this task")
+
 
 class TaskActivityImpl:
     def __init__(self):
@@ -331,16 +373,11 @@ class TaskActivityImpl:
     # Main method to create task
     async def create_task(self, db: Session, task_data: TaskActivityCreate, current_user: User):
         try:
-            # Check user authentication
-            check_user_auth(current_user)
-            user_id = current_user.id
-            logger.info(f"Creating task for user {task_data.assigned_to_id}")
-
             if validate_due_date(task_data.due_date):
                 # Validate fields asynchronously using a ThreadPoolExecutor
-                run_validations(db, task_data)
+                run_validations(db, task_data.dict())
 
-                task = _create_task_entry_and_save(db, task_data, user_id)
+                task = _create_task_entry_and_save(db, task_data, current_user.id)
 
                 # Handle and attach attachments
                 attachment_ids = []
@@ -355,7 +392,7 @@ class TaskActivityImpl:
                 await log_task_history(db, task_id=task.task_id, action="Added", new_data=task_data.dict(),
                                        current_user=current_user)
 
-                logger.info(f"Task created successfully for user {user_id}, Task ID: {task.task_id}")
+                logger.info(f"Task created successfully for user {current_user.user_id}, Task ID: {task.task_id}")
 
                 response = task_created_response(task)
 
@@ -378,20 +415,32 @@ class TaskActivityImpl:
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
     # get created task based on pagination
-    async def get_created_tasks(self, db: Session, current_user: User, skip: int = 0, limit: int = 10,
-                                sort_order: str = 'asc'):
+    async def get_tasks(
+            self,
+            db: Session, current_user: User, task_type: str, skip: int = 0, limit: int = 10, sort_order: str = 'asc',
+            _status: Optional[str] = None, due_date_from: Optional[datetime] = None,
+            due_date_to: Optional[datetime] = None, task_name: Optional[str] = None,
+            activity_type_id: Optional[int] = None,
+            assigned_to_id: Optional[int] = None
+    ):
         try:
-            check_user_auth(current_user)
+            if activity_type_id:
+                validate_activity_type(db, activity_type_id)
+            if assigned_to_id:
+                validate_assign_user(db, assigned_to_id)
 
-            # Fetch created tasks
-            tasks = query_tasks(db, user_id=current_user.id, task_type='created', skip=skip, limit=limit,
-                                sort_order=sort_order)
+            # Fetch tasks with filters, based on the task_type (created or assigned)
+            tasks = query_tasks(
+                db, user_id=current_user.id, task_type=task_type, skip=skip, limit=limit, sort_order=sort_order,
+                status=_status, due_date_from=due_date_from, due_date_to=due_date_to, task_name=task_name,
+                assigned_to_id=assigned_to_id, activity_type_id=activity_type_id
+            )
 
             if not tasks:
                 logger.info(f"No tasks found for user {current_user.id}")
                 return ResponseWrapper(status_code=status.HTTP_200_OK, values=[])
 
-            logger.info(f"Retrieved {len(tasks)} tasks for user {current_user.id}")
+            logger.info(f"Retrieved {len(tasks)} {task_type} tasks for user {current_user.id}")
 
             # Wrap the tasks in the response model
             return wrap_task_response(tasks)
@@ -408,45 +457,17 @@ class TaskActivityImpl:
             logger.error(f"Unexpected error retrieving tasks for user {current_user.id}: {str(e)}")
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
-    # get assigned task based on pagination
-    async def get_assigned_tasks(self, db: Session, current_user: User, skip: int = 0, limit: int = 10,
-                                 sort_order: str = 'asc'):
-        try:
-            check_user_auth(current_user)
-
-            # Fetch assigned tasks
-            tasks = query_tasks(db, user_id=current_user.id, task_type='assigned', skip=skip, limit=limit,
-                                sort_order=sort_order)
-
-            if not tasks:
-                logger.info(f"No assigned tasks found for user {current_user.id}")
-                return ResponseWrapper(status_code=status.HTTP_200_OK, values=[])
-
-            logger.info(f"Retrieved {len(tasks)} assigned tasks for user {current_user.id}")
-
-            # Wrap the tasks in the response model
-            return wrap_task_response(tasks)
-
-        except HTTPException as http_exc:
-            logger.error(f"HTTP error retrieving assigned tasks: {str(http_exc.detail)}")
-            raise http_exc
-
-        except SQLAlchemyError as e:
-            logger.error(f"Error retrieving assigned tasks for user {current_user.id}: {str(e)}")
-            raise HTTPException(status_code=500, detail="An error occurred while retrieving assigned tasks")
-
-        except Exception as e:
-            logger.error(f"Unexpected error retrieving assigned tasks for user {current_user.id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-
     # update a task
     async def update_task(self, db: Session, task_id: int, task_data: dict, current_user: User):
         try:
-            # Ensure user authentication
-            check_user_auth(current_user)
+
+            if 'due_date' in task_data:
+                validate_due_date(task_data.get('due_date'))
 
             # Fetch task by ID
             task = _get_task_by_id(db, task_id)
+
+            run_validations(db, task_data)
 
             # Ensure the current user has permission to update the task
             _check_task_permissions(task, current_user)
@@ -454,7 +475,7 @@ class TaskActivityImpl:
             # Store the previous task data
             previous_data = _get_previous_task_data(task)
 
-            # Handle attachments separately if they exist in task_data
+            # Handle attachments if provided
             if 'attachments' in task_data and task_data['attachments'] is not None:
                 # Convert dictionaries to AttachmentCreate models
                 attachments = [AttachmentCreate(**attachment) for attachment in task_data['attachments']]
@@ -481,40 +502,25 @@ class TaskActivityImpl:
                                    new_data=task_data, current_user=current_user)
 
             logger.info(f"Task with ID {task_id} updated successfully")
-
             return ResponseWrapper(
                 status_code=status.HTTP_200_OK,
                 values=task
             )
-        except HTTPException as http_exc:
-            logger.error(f"HTTP error during task update: {str(http_exc.detail)}")
-            raise http_exc
-
-        except SQLAlchemyError as e:
-            logger.error(f"Error updating task with ID {task_id}: {str(e)}")
-            db.rollback()
-            raise HTTPException(status_code=500, detail="An error occurred while updating the task")
 
         except Exception as e:
             logger.error(f"Unexpected error updating task with ID {task_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"An unexpected error occurred")
 
     async def get_task_by_id(self, db: Session, task_id: int, current_user: User):
         try:
-            # Ensure the user is authenticated
-            check_user_auth(current_user)
-
             # Retrieve the task by ID
             task = _get_task_by_id(db, task_id)
             # If task not found, raise 404 error
             if not task:
                 logger.warning(f"Task with ID {task_id} not found")
-                raise HTTPException(status_code=404, detail=f"Task with ID {task_id} not found")
+                raise HTTPException(status_code=404, detail=f"Task not found")
 
-            # Check if the current user is either the creator, the assignee, or an admin
-            if not current_user.is_admin and task.created_by_id != current_user.id and task.assigned_to_id != current_user.id:
-                logger.warning(f"Unauthorized access attempt for task {task_id} by user {current_user.id}")
-                raise HTTPException(status_code=403, detail="You do not have access to this task")
+            _check_user_permission(current_user, task, task_id)
 
             logger.info(f"Task with ID {task_id} retrieved successfully for user {current_user.id}")
 
@@ -525,29 +531,21 @@ class TaskActivityImpl:
                 values=task_response
             )
 
-        except HTTPException as http_exc:
-            logger.error(f"HTTP error retrieving task by ID {task_id}: {str(http_exc.detail)}")
-            raise http_exc
-
-        except SQLAlchemyError as e:
-            logger.error(f"Error retrieving task by ID {task_id} for user {current_user.id}: {str(e)}")
-            raise HTTPException(status_code=500, detail="An error occurred while retrieving the task")
-
         except Exception as e:
             logger.error(f"Unexpected error retrieving task by ID {task_id} for user {current_user.id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"An unexpected error occurred")
 
     # delete a task
     async def delete_task(self, db: Session, task_id: int, current_user: User):
         try:
-            # Check user authentication
-            check_user_auth(current_user)
 
             # Fetch the task by ID
             task = _get_task_by_id(db, task_id)
             if not task:
                 logger.warning(f"Task with ID {task_id} not found")
                 raise HTTPException(status_code=404, detail=f"Task with ID {task_id} not found")
+
+            _check_user_permission(current_user, task, task_id)
 
             # Delete task history records before deleting the task itself
             _delete_task_history(db, task_id)
@@ -562,62 +560,8 @@ class TaskActivityImpl:
                 values={}
             )
 
-        except HTTPException as http_exc:
-            logger.error(f"HTTP error during task deletion: {str(http_exc.detail)}")
-            raise http_exc
-
-        except SQLAlchemyError as e:
-            logger.error(f"Error deleting task with ID {task_id}: {str(e)}")
-            db.rollback()
-            raise HTTPException(status_code=500, detail="An error occurred while deleting the task")
-
         except Exception as e:
             logger.error(f"Unexpected error deleting task with ID {task_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"An unexpected error occurred")
 
-    # Task history
-    async def get_task_history(self, db: Session, task_id: int):
-        try:
-            history = db.query(TaskHistory).filter(TaskHistory.task_id == task_id).all()
-            if not history:
-                logger.info(f"No history found for task ID {task_id}")
-                return []
 
-            logger.info(f"Retrieved history for task ID {task_id}")
-            return history
-
-        except HTTPException as http_exc:
-            logger.error(f"HTTP error during user creation: {str(http_exc.detail)}")
-            raise http_exc
-
-        except SQLAlchemyError as e:
-            logger.error(f"Error retrieving history for task ID {task_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail="An error occurred while retrieving task history")
-
-        except Exception as e:
-            logger.error(f"Unexpected error retrieving history for task ID {task_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
-
-    # Task history latest (last two records)
-    async def get_task_history_latest(self, db: Session, task_id: int):
-        try:
-            latest_history = db.query(TaskHistory).filter(TaskHistory.task_id == task_id).order_by(
-                desc(TaskHistory.created_at)).limit(2).all()
-            if not latest_history:
-                logger.info(f"No recent history found for task ID {task_id}")
-                return []
-
-            logger.info(f"Retrieved latest history for task ID {task_id}")
-            return latest_history
-
-        except HTTPException as http_exc:
-            logger.error(f"HTTP error during user creation: {str(http_exc.detail)}")
-            raise http_exc
-
-        except SQLAlchemyError as e:
-            logger.error(f"Error retrieving latest history for task ID {task_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail="An error occurred while retrieving the latest task history")
-
-        except Exception as e:
-            logger.error(f"Unexpected error retrieving latest history for task ID {task_id}: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")

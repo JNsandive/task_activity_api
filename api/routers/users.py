@@ -14,7 +14,7 @@ async def create_user_api(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/users", response_model=list[UsersResponse], tags=["User Activity"])
-async def list_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+async def list_of_users(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     return await user_impl.get_users(db, skip=skip, limit=limit)
 
 
