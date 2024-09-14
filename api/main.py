@@ -7,9 +7,9 @@ from fastapi.exception_handlers import http_exception_handler
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.middleware.cors import CORSMiddleware
 
-from .exceptions import sqlalchemy_exception_handler, general_exception_handler
-from .routers import tasks, users, task_history, auth, webhooks
-from .database import Base, engine
+from api.exceptions import sqlalchemy_exception_handler, general_exception_handler
+from api.routers import tasks, users, task_history, auth
+from api.database import Base, engine
 
 import logging
 
@@ -44,7 +44,6 @@ app.include_router(tasks.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(task_history.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
-# app.include_router(webhooks.router, prefix="/api")
 
 # Register custom exception handlers
 app.add_exception_handler(SQLAlchemyError, sqlalchemy_exception_handler)
@@ -52,4 +51,4 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run("api.main:app", host="127.0.0.1", port=8000, reload=True)

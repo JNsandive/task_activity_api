@@ -36,3 +36,4 @@
 2024-09-14 19:10:28 - api.auth_service - INFO - Authentication successful for user: nihiyauj@gmail.com
 2024-09-14 19:10:51 - api.task_service - INFO - Email sent successfully
 2024-09-14 19:10:58 - api.task_service - INFO - Task with ID 7 updated successfully
+2024-09-14 19:41:56 - api.auth_service - INFO - Authentication successful for user: nihiyauj@gmail.com

@@ -81,7 +81,6 @@ class TaskActivityImpl:
         return activity_group
 
     """Validate due date"""
-
     @staticmethod
     def validate_due_date(due_date: datetime):
         if due_date:
@@ -100,7 +99,6 @@ class TaskActivityImpl:
         return True
 
     """Validate fields asynchronously using a ThreadPoolExecutor"""
-
     def run_validations(self, db: Session, task_data: dict):
         # Use ThreadPoolExecutor to validate fields concurrently
         with ThreadPoolExecutor() as executor:
@@ -127,7 +125,6 @@ class TaskActivityImpl:
                 future.result()  # Raise any exception
 
     """Create a task entry in the database"""
-
     @staticmethod
     def _create_task_entry_and_save(db: Session, task_data, user_id: int):
         task = TaskActivity(
