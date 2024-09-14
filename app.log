@@ -13,3 +13,26 @@
 2024-09-14 14:05:47 - api.task_service - INFO - Task with ID 12 updated successfully
 2024-09-14 14:06:37 - api.task_service - INFO - Email sent successfully
 2024-09-14 14:06:37 - api.task_service - INFO - Task with ID 12 updated successfully
+2024-09-14 18:35:01 - api.auth_service - INFO - Authentication successful for user: nihiyauj@gmail.com
+2024-09-14 18:39:10 - api.task_service - INFO - Retrieved 3 created tasks for user 1
+2024-09-14 18:39:38 - api.task_service - INFO - Retrieved 7 created tasks for user 1
+2024-09-14 18:40:27 - api.task_service - INFO - No tasks found for user 1
+2024-09-14 18:40:50 - api.task_service - INFO - Retrieved 7 created tasks for user 1
+2024-09-14 18:41:43 - api.task_service - INFO - Retrieved 3 created tasks for user 1
+2024-09-14 18:42:32 - api.task_service - INFO - Retrieved 1 created tasks for user 1
+2024-09-14 18:42:48 - api.task_service - INFO - Retrieved 9 created tasks for user 1
+2024-09-14 18:42:59 - api.task_service - INFO - No tasks found for user 1
+2024-09-14 18:45:51 - api.task_service - INFO - Email sent successfully
+2024-09-14 18:45:52 - api.task_service - INFO - Task with ID 7 updated successfully
+2024-09-14 18:48:51 - api.crud_users - INFO - User created successfully: user@example.com
+2024-09-14 18:56:57 - api.task_service - INFO - Email sent successfully
+2024-09-14 18:57:19 - api.task_service - ERROR - Unexpected error logging task history for task ID 7: 'TaskActivity' object has no attribute 'items'
+2024-09-14 18:57:19 - api.task_service - ERROR - Unexpected error updating task with ID 7: 500: An unexpected error occurred: 'TaskActivity' object has no attribute 'items'
+2024-09-14 18:58:00 - api.task_service - INFO - Email sent successfully
+2024-09-14 18:58:48 - api.task_service - ERROR - Unexpected error logging task history for task ID 7: 'TaskActivity' object has no attribute 'items'
+2024-09-14 19:04:13 - api.task_service - INFO - Email sent successfully
+2024-09-14 19:04:41 - api.task_service - INFO - Task with ID 7 updated successfully
+2024-09-14 19:09:35 - api.auth_service - INFO - Authentication successful for user: nihiyauj@gmail.com
+2024-09-14 19:10:28 - api.auth_service - INFO - Authentication successful for user: nihiyauj@gmail.com
+2024-09-14 19:10:51 - api.task_service - INFO - Email sent successfully
+2024-09-14 19:10:58 - api.task_service - INFO - Task with ID 7 updated successfully

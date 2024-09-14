@@ -1,4 +1,5 @@
 import logging
+import os
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -12,9 +13,12 @@ from starlette import status
 from .database import get_db
 from .models import User
 from .schemas import AccessToken
+from dotenv import load_dotenv
 
-SECRET_KEY = "your_jwt_secret_key"
-ALGORITHM = "HS256"
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 logger = logging.getLogger(__name__)

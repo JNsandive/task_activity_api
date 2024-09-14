@@ -4,6 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
+
 load_dotenv()
 
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -14,8 +15,9 @@ Base = declarative_base()
 
 
 def get_db():
+    """This function is used to get a database connection"""
     db = SessionLocal()
     try:
-        yield db
+        yield db  # Pause the execution of the function and return the db connection
     finally:
         db.close()

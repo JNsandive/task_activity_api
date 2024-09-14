@@ -7,7 +7,7 @@ from starlette import status
 
 from .models import User
 from .schemas import UserCreate, UserCreatedResponse, UserResponse
-from .auth_impl import get_password_hash
+from .auth_service import get_password_hash
 
 # Initialize the logger
 logger = logging.getLogger(__name__)

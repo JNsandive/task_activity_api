@@ -11,3 +11,4 @@ due_data = 'due_date'
 Modified = 'Modified'
 Added = 'Added'
 
+your_jwt_secret_key = 'your_jwt'

@@ -81,6 +81,7 @@ class TaskActivityImpl:
         return activity_group
 
     """Validate due date"""
+
     @staticmethod
     def validate_due_date(due_date: datetime):
         if due_date:
@@ -99,6 +100,7 @@ class TaskActivityImpl:
         return True
 
     """Validate fields asynchronously using a ThreadPoolExecutor"""
+
     def run_validations(self, db: Session, task_data: dict):
         # Use ThreadPoolExecutor to validate fields concurrently
         with ThreadPoolExecutor() as executor:
@@ -125,6 +127,7 @@ class TaskActivityImpl:
                 future.result()  # Raise any exception
 
     """Create a task entry in the database"""
+
     @staticmethod
     def _create_task_entry_and_save(db: Session, task_data, user_id: int):
         task = TaskActivity(
@@ -152,6 +155,7 @@ class TaskActivityImpl:
         return task
 
     """Updated _handle_attachments method"""
+
     @staticmethod
     def _handle_attachments(db: Session, task: TaskActivity, attachments: List[AttachmentCreate]):
         if attachments:
@@ -189,11 +193,13 @@ class TaskActivityImpl:
             raise HTTPException(status_code=401, detail="Unauthorized")
 
     """ Helper method to determine sorting order"""
+
     @staticmethod
     def get_sort_order(sort_order: str):
         return asc(TaskActivity.created_on) if sort_order == "asc" else desc(TaskActivity.created_on)
 
     """Helper method to fetch tasks (created or assigned)"""
+
     def query_tasks(self,
                     db: Session,
                     user_id: int,
@@ -241,6 +247,7 @@ class TaskActivityImpl:
         return query.all()
 
     """ Helper method to wrap tasks in the response"""
+
     @staticmethod
     def wrap_task_response(tasks: List[TaskActivity]):
         task_responses = []
@@ -322,9 +329,18 @@ class TaskActivityImpl:
         return task
 
     """Log task history"""
-    async def log_task_history(self,db: Session, task_id: int, action: str, current_user: User, previous_data=None,
+
+    async def log_task_history(self, db: Session, task_id: int, action: str, current_user: User, previous_data=None,
                                new_data=None):
         try:
+            # Convert previous_data and new_data from model objects to dictionaries if necessary
+            if previous_data and not isinstance(previous_data, dict):
+                previous_data = {column.name: getattr(previous_data, column.name) for column in
+                                 previous_data.__table__.columns}
+
+            if new_data and not isinstance(new_data, dict):
+                new_data = {column.name: getattr(new_data, column.name) for column in new_data.__table__.columns}
+
             # Ensure data is JSON serializable
             if previous_data:
                 previous_data = {key: (value.isoformat() if isinstance(value, datetime) else value) for key, value in
@@ -416,6 +432,7 @@ class TaskActivityImpl:
             raise e
 
     """Main method to create task"""
+
     async def create_task(self, db: Session, task_data: TaskActivityCreate, current_user: User):
         try:
             if self.validate_due_date(task_data.due_date):
@@ -460,6 +477,7 @@ class TaskActivityImpl:
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
     """get created task based on pagination"""
+
     async def get_tasks(
             self,
             db: Session, current_user: User, task_type: str, skip: int = 0, limit: int = 10, sort_order: str = 'asc',
@@ -495,6 +513,7 @@ class TaskActivityImpl:
             raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
     """update a task"""
+
     async def update_task(self, db: Session, task_id: int, task_data: dict, current_user: User):
         try:
 
@@ -540,9 +559,11 @@ class TaskActivityImpl:
             db.commit()
             db.refresh(task)
 
+            task = self._get_task_by_id(db, task_id)
+
             # Log the changes in history
             await self.log_task_history(db, task_id=task.task_id, action=Modified, previous_data=previous_data,
-                                        new_data=task_data, current_user=current_user)
+                                        new_data=task, current_user=current_user)
 
             logger.info(f"Task with ID {str(task.task_id)} updated successfully")
             return ResponseWrapper(

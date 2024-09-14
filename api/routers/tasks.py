@@ -8,7 +8,7 @@ from ..task_service import TaskActivityImpl
 from ..models import User
 from ..schemas import TaskActivityCreate, TaskResponse, TaskCreatedResponse, ResponseWrapper
 from ..database import get_db
-from ..auth_impl import get_current_user
+from ..auth_service import get_current_user
 
 router = APIRouter()
 task_impl = TaskActivityImpl()
