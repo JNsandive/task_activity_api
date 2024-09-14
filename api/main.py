@@ -1,5 +1,7 @@
 from http.client import HTTPException
+from logging.handlers import RotatingFileHandler
 
+import uvicorn
 from fastapi import FastAPI
 from fastapi.exception_handlers import http_exception_handler
 from sqlalchemy.exc import SQLAlchemyError
@@ -11,12 +13,23 @@ from .database import Base, engine
 
 import logging
 
+# Configure logging
+handler = RotatingFileHandler('app.log', maxBytes=20000000, backupCount=5)
+logging.basicConfig(
+    handlers=[handler],  # File handler
+    level=logging.INFO,  # Log level
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Log format
+    datefmt='%Y-%m-%d %H:%M:%S',  # Date format
+)
+
+# Initialize logger
+logger = logging.getLogger(__name__)
+
 
 # Create all database tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
-logger = logging.getLogger("global_exception_handler")
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,21 +51,5 @@ app.add_exception_handler(SQLAlchemyError, sqlalchemy_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
-# Global Exception Handler
-# @app.exception_handler(Exception)
-# async def global_exception_handler(request: Request, exc: Exception):
-#     logger.critical(f"Unexpected error: {exc}")
-#     return JSONResponse(
-#         status_code=500,
-#         content={"detail": "An unexpected error occurred. Please try again later."}
-#     )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("app.log"),
-    ]
-)
+if __name__ == "__main__":
+    uvicorn.run(app, host="localhost", port=8000)

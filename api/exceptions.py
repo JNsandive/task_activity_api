@@ -30,8 +30,7 @@ async def http_exception_handler( exc: HTTPException):
 
 
 @app.exception_handler(Exception)
-async def general_exception_handler(exc: Exception):
-    logger.error(f"Unexpected error occurred: {str(exc)}")
+async def general_exception_handler():
     return JSONResponse(
         status_code=500,
         content=ErrorResponse(detail="An unexpected error occurred").dict()

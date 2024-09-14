@@ -2,13 +2,10 @@ import json
 import logging
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, asc, func
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session
 
-from api.models import TaskHistory, TaskActivity, User
+from api.models import TaskHistory, User
 from api.schemas import TaskHistoryResponse, ResponseWrapper, TaskHistoryDetailsResponse, TaskDataResponse
-from api.task_service import check_user_auth
 
 logger = logging.getLogger(__name__)
 
@@ -17,41 +14,6 @@ class TasksHistory():
 
     def __init__(self):
         pass
-
-    async def get_task_history(self, db: Session, task_id: int, skip: int = 0, limit: int = 10,
-                               current_user: int = None):
-        try:
-
-            # Fetch task history records from the database
-            tasks = db.query(TaskHistory).filter(TaskHistory.task_id == task_id) \
-                .order_by(TaskHistory.created_at.desc()) \
-                .offset(skip).limit(limit).all()
-
-            # Convert the fetched TaskHistory objects into TaskHistoryResponse models
-            task_history_responses = []
-            for task in tasks:
-                # Deserialize previous_data and new_data
-                previous_data = json.loads(task.previous_data) if task.previous_data else None
-                new_data = json.loads(task.new_data) if task.new_data else None
-
-                task_history_responses.append(TaskHistoryResponse(
-                    id=task.id,
-                    task_id=task.task_id,
-                    action=task.action,
-                    previous_data=previous_data,
-                    new_data=new_data,
-                    created_at=task.created_at,
-                    modified_by=task.modified_by
-                ))
-
-            return ResponseWrapper(
-                status_code=status.HTTP_200_OK,
-                values=task_history_responses  # Make sure this is a list of TaskHistoryResponse
-            )
-
-        except Exception as e:
-            logger.error(f"Unexpected error retrieving history for task ID {task_id}: {str(e)}")
-            raise
 
     @staticmethod
     def _get_order_by_clause(sort_order: str):
@@ -95,7 +57,6 @@ class TasksHistory():
         user = db.query(User).filter(User.id == user_id).first()
         return user.name if user else "N/A"
 
-
     @staticmethod
     def _get_deserialized_data(data):
         """Helper method to deserialize JSON data."""
@@ -106,11 +67,13 @@ class TasksHistory():
         """Fetch the user's name using the user_id."""
         user = db.query(User).filter(User.id == user_id).first()
         return user.username if user else "N/A"
+
     async def get_all_task_histories(self,
                                      db: Session,
                                      skip: int = 0,
                                      limit: int = 10,
                                      sort_order: str = 'asc'):
+        """Get all task histories."""
         try:
             # Get the order by clause
             order_by_clause = self._get_order_by_clause(sort_order)
@@ -132,6 +95,7 @@ class TasksHistory():
             raise
 
     async def get_task_history_details(self, task_id: int, db: Session):
+        """Get details of the task history"""
         try:
             task_history = db.query(TaskHistory).filter(TaskHistory.task_id == task_id).all()
 
@@ -174,4 +138,3 @@ class TasksHistory():
         except Exception as e:
             logger.error(f"Error fetching task history details: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
-

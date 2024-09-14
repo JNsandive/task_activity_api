@@ -1,12 +1,15 @@
-2024-09-11 15:07:58,242 [INFO] api.crud_users: User created successfully: user@example.com
-2024-09-11 15:08:24,146 [WARNING] api.crud_users: Attempt to create user with existing email: user@example.com
-2024-09-11 15:08:24,147 [ERROR] api.crud_users: HTTP error during user creation: Email is already registered
-2024-09-11 15:09:06,020 [WARNING] api.crud_users: User with ID 1 not found
-2024-09-11 15:09:06,020 [CRITICAL] api.crud_users: Unexpected error while fetching user ID 1: 404: User with ID 1 not found
-2024-09-11 15:10:44,542 [WARNING] api.crud_users: User with ID 1 not found
-2024-09-11 15:10:44,542 [ERROR] api.crud_users: HTTP error while fetching user ID 1: User with ID 1 not found
-2024-09-11 15:20:49,968 [INFO] api.crud_users: User created successfully: nihiya@example.com
-2024-09-11 16:27:15,070 [CRITICAL] api.crud_users: Unexpected error during user creation: get_password_hash() missing 1 required positional argument: 'password'
-2024-09-11 16:39:36,535 [INFO] api.crud_users: User created successfully: amaa@example.com
-2024-09-11 16:40:23,473 [INFO] api.auth_impl: Authentication successful for user: amaa@example.com
-2024-09-11 17:09:06,279 [INFO] api.auth_impl: Authentication successful for user: amaa@example.com
+2024-09-14 13:06:22 - api.task_service - INFO - Retrieved 10 created tasks for user 1
+2024-09-14 13:49:23 - api.auth_impl - INFO - Authentication successful for user: nihiyauj@gmail.com
+2024-09-14 13:51:15 - api.auth_impl - INFO - Authentication successful for user: nihindu.20222156@iit.ac.lk
+2024-09-14 13:51:45 - api.task_service - INFO - Retrieved 1 created tasks for user 2
+2024-09-14 13:53:10 - api.task_service - ERROR - Unexpected error updating task with ID 5: 404: Task with ID 5 not found
+2024-09-14 13:53:32 - api.task_service - ERROR - Unexpected error updating task with ID 5: 404: Task with ID 5 not found
+2024-09-14 13:53:51 - api.task_service - ERROR - Unexpected error updating task with ID 5: 404: Task with ID 5 not found
+2024-09-14 13:54:21 - api.task_service - ERROR - Unexpected error updating task with ID 6: TaskActivityImpl.log_task_history() got multiple values for argument 'task_id'
+2024-09-14 13:55:02 - api.task_service - ERROR - Unexpected error updating task with ID 6: TaskActivityImpl.log_task_history() got multiple values for argument 'task_id'
+2024-09-14 13:57:49 - api.task_service - ERROR - Unexpected error updating task with ID 6: TaskActivityImpl.log_task_history() got multiple values for argument 'task_id'
+2024-09-14 14:02:46 - api.task_service - INFO - Task with ID 6 updated successfully
+2024-09-14 14:04:49 - api.task_service - INFO - Task with ID 12 updated successfully
+2024-09-14 14:05:47 - api.task_service - INFO - Task with ID 12 updated successfully
+2024-09-14 14:06:37 - api.task_service - INFO - Email sent successfully
+2024-09-14 14:06:37 - api.task_service - INFO - Task with ID 12 updated successfully

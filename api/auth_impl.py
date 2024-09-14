@@ -84,6 +84,7 @@ async def authenticate_user_and_create_token(db: Session, username: str, passwor
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    """based on the token, get the user from the database"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
