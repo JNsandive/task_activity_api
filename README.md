@@ -1,6 +1,9 @@
-# Project Name
+# Task Management API
 
-A brief description of your project.
+This is a simple Task Management API built with FastAPI. It allows users to create, update, and delete tasks, as well as send email notifications for task activities.
+Can filter tasks based on the attributes.
+
+Also, can view the History of the task activities.
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
